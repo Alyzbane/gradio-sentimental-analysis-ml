@@ -44,12 +44,12 @@ def analyze_sentiment(text, model_choice):
     elif model_choice == "MultinomialNB":
         return pipeline(model2, [text], vectorizer2)[text]
 
-with gr.Blocks(theme=gr.themes.Default()) as demo:
+with gr.Blocks(theme=gr.themes.Glass(), title="Sentimental Analysis") as demo:
     gr.Markdown("# 🎮 Sentiment Analysis for Steam Reviews")
     gr.Markdown("✨ Enter a Steam review to analyze its sentiment. For more information, see the dataset used at [Kaggle Steam Reviews](https://www.kaggle.com/datasets/filipkin/steam-reviews)")
     
     gr.Markdown("[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/your-username/your-repository)")
-    
+
     with gr.Row():
         with gr.Column():
             review_input = gr.Textbox(lines=2, placeholder="Enter Steam review here...", label="💬 Steam Review Input")
