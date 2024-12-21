@@ -37,9 +37,9 @@ A brief description of what this project does and who it's for.
 ## Example Reviews
 | Review |
 |--------|
-| "This game is amazing! I loved every moment of it." |
-| "The graphics are decent, but the gameplay is very repetitive." |
-| "Terrible game. It crashes all the time and is unplayable." |
+| This game is amazing! I loved every moment of it. |
+| The graphics are decent, but the gameplay is very repetitive. |
+| Terrible game. It crashes all the time and is unplayable. |
 
 ## Contributing
 Contributions are welcome! Please open an issue or submit a pull request.

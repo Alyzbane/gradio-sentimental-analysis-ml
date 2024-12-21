@@ -3,7 +3,6 @@ import joblib
 import os
 import re
 import string
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Load the models and vectorizers
 def load_model_and_vectorizer(path, model_filename='model.pkl', vectorizer_filename='vectorizer.pkl'):
@@ -14,67 +13,105 @@ def load_model_and_vectorizer(path, model_filename='model.pkl', vectorizer_filen
 # Text preprocessing
 def preprocess_text(text):
     text = text.lower()
-    text = re.sub(r'http\\S+|www\\S+|https\\S+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
     text = text.translate(str.maketrans('', '', string.punctuation))
     text = text.strip()
     return text
 
-# Prediction pipeline
-def pipeline(model, inputs, vectorizer):
-    results = {}
-    for text in inputs:
-        preprocessed = preprocess_text(text)
-        vectorized = vectorizer.transform([preprocessed])
-        prediction = model.predict(vectorized)
-        confidence_scores = model.predict_proba(vectorized)[0]  # Get confidence scores for both classes
-        results[text] = {
-            "Positive Sentiment": confidence_scores[1],
-            "Negative Sentiment": confidence_scores[0]
-        }
-    return results
+# Load all models at startup
+models = {
+    "Linear Regression": load_model_and_vectorizer(path=os.path.join('models', 'lr')),
+    "MultinomialNB": load_model_and_vectorizer(path=os.path.join('models', 'mnb')),
+    "SVM": load_model_and_vectorizer(path=os.path.join('models', 'svm')),
+    "Random Forest": load_model_and_vectorizer(path=os.path.join('models', 'rf'))
+}
 
-# Load the models and vectorizers
-model1, vectorizer1 = load_model_and_vectorizer(path=os.path.join('models', 'lr'))
-model2, vectorizer2 = load_model_and_vectorizer(path=os.path.join('models', 'mnb'))
+def predict_sentiment(message, model_name="MultinomialNB"):
+    model, vectorizer = models[model_name]
+    preprocessed = preprocess_text(message)
+    vectorized = vectorizer.transform([preprocessed])
+    prediction = model.predict(vectorized)[0]
+    return prediction
 
-# Create a Gradio interface
-def analyze_sentiment(text, model_choice):
-    if model_choice == "Linear Regression":
-        return pipeline(model1, [text], vectorizer1)[text]
-    elif model_choice == "MultinomialNB":
-        return pipeline(model2, [text], vectorizer2)[text]
-
-with gr.Blocks(theme=gr.themes.Glass(), title="Sentimental Analysis") as demo:
-    gr.Markdown("# 🎮 Sentiment Analysis for Steam Reviews")
-    gr.Markdown("✨ Enter a Steam review to analyze its sentiment. For more information, see the dataset used at [Kaggle Steam Reviews](https://www.kaggle.com/datasets/filipkin/steam-reviews)")
+def get_bot_response(message, chat_history, model_choice):
+    message = message["text"]
+    if not message.strip():
+        bot_response = "😺 Please share a game review!"
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": bot_response})
+        return "", chat_history
     
-    gr.Markdown("[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/your-username/your-repository)")
+    # Get sentiment prediction
+    sentiment = predict_sentiment(message, model_choice)
+    
+    # Generate response based on sentiment
+    if sentiment == 1:
+        bot_response = f"😸 This is a Positive review!"
+    else:
+        bot_response = f"😾 This is a Negative review!"
+   
+    chat_history.append({"role": "user", "content": message})
+    chat_history.append({"role": "assistant", "content": bot_response})
+    return "", chat_history
+
+# Create the Gradio interface
+with gr.Blocks(theme=gr.themes.Default(), title="Gaming Sentiment Chatbot", css=".upload-button {display: none;} .centered-md {text-align: center}") as demo:
+    gr.Markdown("# 🎮 Steam Review Sentiment Analysis", elem_classes="centered-md")
+    gr.Markdown("""
+    <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
+    ✨ Enter a Steam review to analyze its sentiment. For more information, see the dataset used at:
+        <a href="https://www.kaggle.com/datasets/filipkin/steam-reviews" target="_blank">
+            <img src="https://img.shields.io/badge/Kaggle-Steam%20Reviews-blue?logo=kaggle" alt="Kaggle">
+        </a>
+        |
+        <a href="https://github.com/alyzbane/gradio-sentimental-analysis-ml" target="_blank">
+            <img src="https://img.shields.io/badge/GitHub-Repository-blue?logo=github" alt="GitHub">
+        </a>
+    </div>
+    """, elem_classes="centered-md")
+
+   
+    chatbot = gr.Chatbot(
+        type="messages",
+        label="History",
+        placeholder="Share a though about video game 🎮👇",
+        height=400,
+    )
+    
+    with gr.Row():
+        message = gr.MultimodalTextbox(
+        interactive=True,
+        placeholder="Enter message...",
+        show_label=False,
+        )
 
     with gr.Row():
-        with gr.Column():
-            review_input = gr.Textbox(lines=2, placeholder="Enter Steam review here...", label="💬 Steam Review Input")
-            model_choice = gr.Dropdown(choices=["Linear Regression", "MultinomialNB"], label="Select Model")
-            analyze_button = gr.Button("Analyze")
-        with gr.Column():
-            sentiment_output = gr.Label(label="📊 Sentiment Analysis Result")
+        model_choice = gr.Dropdown(
+            choices=list(models.keys()),
+            value="MultinomialNB",
+            label=r"↓ Select Model for Analysis",
+        )
     
-    analyze_button.click(
-        analyze_sentiment, 
-        inputs=[review_input, model_choice], 
-        outputs=sentiment_output
-    )
-    
-    gr.Markdown("## Example Reviews")
-    example_table = gr.Examples(
+    # Example messages
+    gr.Markdown("## Example Messages")
+    examples = gr.Examples(
         examples=[
-            ["This game is amazing! I loved every moment of it."],
-            ["The graphics are decent, but the gameplay is very repetitive."],
-            ["Terrible game. It crashes all the time and is unplayable."]
+            "This game is absolutely fantastic! The graphics and gameplay are incredible!",
+            "I can't believe how buggy this game is. Constant crashes and poor optimization.",
+            "Decent game but nothing special. Might be worth it on sale.",
+            "Best game I've played this year! The story is amazing!",
+            "this game is 1/10 at best. Waste of money"
         ],
-        inputs=review_input,
-        label="Example Reviews",
+        inputs=message,
+        label="Example Messages"
+    )
+   
+    # Also allow Enter key to submit
+    message.submit(
+        fn=get_bot_response,
+        inputs=[message, chatbot, model_choice],
+        outputs=[message, chatbot]
     )
 
-# Launch the Gradio app
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(debug=False)
